@@ -1,5 +1,5 @@
 // REPLACE THIS with your actual Render API URL after you deploy the backend
-const API_URL = "YOUR_RENDER_URL_HERE"; 
+const API_URL = "https://stock-prediction-backend-xpts.onrender.com/"; 
 
 // Public proxy to get Yahoo Finance data (free)
 const YAHOO_API = "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=3mo";
@@ -132,4 +132,5 @@ function addPredictionToChart(predPrice) {
     };
     
     Plotly.addTraces('stockChart', update);
+
 }
