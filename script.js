@@ -1,5 +1,5 @@
 // REPLACE with your Render URL
-const API_URL = "https://stock-prediction-backend-xpts.onrender.com/"; 
+const API_URL = "https://stock-prediction-backend-xpts.onrender.com"; 
 const YAHOO_API = "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=3mo";
 
 let liveData = [];  // Stores the original fetched data
@@ -230,3 +230,4 @@ function updateGauge(percentChange) {
         signalEl.style.color = "#ccc";
     }
 }
+
