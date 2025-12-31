@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apple Stock AI Predictor</title>
+    <title>Apple Stock AI Terminal</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
@@ -11,46 +11,80 @@
 
     <div class="container">
         <header>
-            <h1> Apple Stock AI Predictor</h1>
-            <p>Powered by LSTM Deep Learning</p>
-            <div class="status-badge" id="apiStatus">Checking API...</div>
+            <div class="header-left">
+                <h1> AAPL AI Terminal</h1>
+                <p>LSTM Neural Network • v2.0</p>
+            </div>
+            <div class="header-right">
+                <div class="status-badge" id="apiStatus">Connecting to Brain...</div>
+            </div>
         </header>
 
-        <div class="card chart-card">
-            <div id="stockChart"></div>
+        <div class="top-grid">
+            <div class="card chart-card">
+                <div id="stockChart" class="chart-container"></div>
+            </div>
+
+            <div class="card gauge-card">
+                <h3>AI Sentiment Gauge</h3>
+                <div id="gaugeChart"></div>
+                <div class="gauge-info">
+                    <span id="signalText">WAITING</span>
+                </div>
+            </div>
         </div>
 
         <div class="dashboard-grid">
             
+            <div class="card control-card">
+                <h3>🧪 "What-If" Simulator</h3>
+                <p>Tweak today's market conditions to see how the AI reacts.</p>
+                
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Open ($)</label>
+                        <input type="number" id="simOpen" step="0.5">
+                    </div>
+                    <div class="input-group">
+                        <label>High ($)</label>
+                        <input type="number" id="simHigh" step="0.5">
+                    </div>
+                    <div class="input-group">
+                        <label>Low ($)</label>
+                        <input type="number" id="simLow" step="0.5">
+                    </div>
+                    <div class="input-group">
+                        <label>Volume</label>
+                        <input type="number" id="simVol" step="100000">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="predictBtn" onclick="runPrediction()">
+                        🚀 Run AI Prediction
+                    </button>
+                    <button class="secondary-btn" onclick="resetToLive()">
+                        ↻ Reset to Live Data
+                    </button>
+                </div>
+                <div id="loadingSpinner" class="hidden">Running Neural Net...</div>
+            </div>
+
             <div class="card result-card">
-                <h2>AI Prediction (Next Day)</h2>
-                <div class="prediction-box">
-                    <span class="label">Projected Price</span>
+                <h3>Forecast Results</h3>
+                <div class="result-box">
+                    <span class="label">Projected Close</span>
                     <h1 id="predPrice">---</h1>
                 </div>
-                <div class="signal-box" id="signalBox">
-                    <span class="label">Signal</span>
-                    <h2 id="predSignal">WAITING</h2>
+                <div class="result-box">
+                    <span class="label">Expected Return</span>
+                    <h2 id="predReturn">---%</h2>
                 </div>
                 <div class="confidence-section">
-                    <span>Confidence:</span> <strong id="predConfidence">---</strong>
+                    <span>Model Confidence:</span> <strong id="predConfidence" class="glow-text">---</strong>
                 </div>
             </div>
 
-            <div class="card control-card">
-                <h3>Live Data Controls</h3>
-                <p>The system automatically pulls the last 100 days of OHLCV data.</p>
-                
-                <div class="data-row">
-                    <span>Latest Close:</span>
-                    <strong id="latestClose">---</strong>
-                </div>
-                
-                <button id="predictBtn" onclick="runPrediction()">
-                    Generate Prediction
-                </button>
-                <div id="loadingSpinner" class="hidden">Thinking...</div>
-            </div>
         </div>
     </div>
 
