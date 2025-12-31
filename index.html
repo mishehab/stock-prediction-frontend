@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apple Stock AI Predictor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1> Apple Stock AI Predictor</h1>
+            <p>Powered by LSTM Deep Learning</p>
+            <div class="status-badge" id="apiStatus">Checking API...</div>
+        </header>
+
+        <div class="card chart-card">
+            <div id="stockChart"></div>
+        </div>
+
+        <div class="dashboard-grid">
+            
+            <div class="card result-card">
+                <h2>AI Prediction (Next Day)</h2>
+                <div class="prediction-box">
+                    <span class="label">Projected Price</span>
+                    <h1 id="predPrice">---</h1>
+                </div>
+                <div class="signal-box" id="signalBox">
+                    <span class="label">Signal</span>
+                    <h2 id="predSignal">WAITING</h2>
+                </div>
+                <div class="confidence-section">
+                    <span>Confidence:</span> <strong id="predConfidence">---</strong>
+                </div>
+            </div>
+
+            <div class="card control-card">
+                <h3>Live Data Controls</h3>
+                <p>The system automatically pulls the last 100 days of OHLCV data.</p>
+                
+                <div class="data-row">
+                    <span>Latest Close:</span>
+                    <strong id="latestClose">---</strong>
+                </div>
+                
+                <button id="predictBtn" onclick="runPrediction()">
+                    Generate Prediction
+                </button>
+                <div id="loadingSpinner" class="hidden">Thinking...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
