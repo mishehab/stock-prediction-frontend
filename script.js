@@ -1,13 +1,18 @@
-// REPLACE with your Render URL
 const API_URL = "https://stock-prediction-backend-xpts.onrender.com"; 
 const YAHOO_API = "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=3mo";
 
-let liveData = [];  // Stores the original fetched data
-let simData = [];   // Stores the data we send to the AI (editable)
+// =========================================================
+// 1. CONFIGURATION & STATE
+// =========================================================
 
-// 1. INITIALIZE
+let liveData = [];  // Stores the original fetched data (Source of Truth)
+let simData = [];   // Stores the data we edit for "What-If" scenarios
+
+// =========================================================
+// 2. INITIALIZATION
+// =========================================================
 window.onload = async function() {
-    initGauge(); // Draw empty gauge
+    initGauge(); // Draw the empty gauge first
     await fetchMarketData();
 };
 
@@ -20,7 +25,8 @@ async function fetchMarketData() {
         const quotes = result.indicators.quote[0];
         const timestamps = result.timestamp;
 
-        // Parse Data [Open, High, Low, Close, Volume]
+        // Parse Data: [Open, High, Low, Close, Volume]
+        // We map the raw arrays into a clean list of lists
         liveData = timestamps.map((time, index) => {
             return [
                 quotes.open[index],
@@ -29,18 +35,15 @@ async function fetchMarketData() {
                 quotes.close[index],
                 quotes.volume[index]
             ];
-        }).filter(day => !day.includes(null));
+        }).filter(day => !day.includes(null)); // Remove any incomplete data points
 
-        // Set Simulator Data to match Live Data initially
-        resetToLive();
-        
-        // Update Status
+        // Update UI Status
         const statusEl = document.getElementById('apiStatus');
         statusEl.innerText = "System Ready • Live Data";
         statusEl.style.background = "#2ea043";
 
-        // Draw Chart
-        plotMainChart();
+        // Initialize Simulator with Live Data
+        resetToLive();
 
     } catch (error) {
         console.error("Data Error:", error);
@@ -49,53 +52,64 @@ async function fetchMarketData() {
     }
 }
 
-// 2. FILL INPUTS (The Simulator)
+// =========================================================
+// 3. SIMULATOR LOGIC
+// =========================================================
+
 function populateInputs(lastDayData) {
-    // [Open, High, Low, Close, Volume]
+    // Fill the inputs with the data from the last available day
+    // Format: [Open, High, Low, Close, Volume]
     document.getElementById('simOpen').value = lastDayData[0].toFixed(2);
     document.getElementById('simHigh').value = lastDayData[1].toFixed(2);
     document.getElementById('simLow').value = lastDayData[2].toFixed(2);
-    // Note: We don't edit Close, as that's what we are predicting relative to, 
-    // or we assume the user edits the 'current' day to predict tomorrow.
     document.getElementById('simVol').value = lastDayData[4];
 }
 
 function resetToLive() {
-    // Clone live data into simData
+    // 1. Reset simData to match liveData exactly
     simData = JSON.parse(JSON.stringify(liveData)); 
     
-    // Fill inputs with the LAST day's real data
+    // 2. Reset Inputs
     const lastDay = simData[simData.length - 1];
     populateInputs(lastDay);
     
-    // Reset Chart
+    // 3. Reset Visuals
     plotMainChart(); 
-    updateGauge(0); // Reset gauge
+    updateGauge(0); // Reset gauge to neutral
     
+    // 4. Reset Text
     document.getElementById('predPrice').innerText = "---";
     document.getElementById('predReturn').innerText = "---%";
+    document.getElementById('predConfidence').innerText = "---";
 }
 
-// 3. RUN PREDICTION
+// =========================================================
+// 4. API PREDICTION (THE BRAIN)
+// =========================================================
+
 async function runPrediction() {
     const btn = document.getElementById('predictBtn');
     const spinner = document.getElementById('loadingSpinner');
     
+    // UI Loading State
     btn.disabled = true;
     spinner.classList.remove('hidden');
 
     try {
-        // A. UPDATE SIMDATA WITH USER INPUTS
-        // We modify the LAST row of the data to reflect "What-If" scenarios
+        // A. Update simData with User Inputs
+        // We modify the VERY LAST row of history to match your inputs
         const lastIdx = simData.length - 1;
         simData[lastIdx][0] = parseFloat(document.getElementById('simOpen').value);
         simData[lastIdx][1] = parseFloat(document.getElementById('simHigh').value);
         simData[lastIdx][2] = parseFloat(document.getElementById('simLow').value);
         simData[lastIdx][4] = parseFloat(document.getElementById('simVol').value);
+        // Note: We keep Close price as is, or you could add an input for it if you want
 
-        // B. SEND TO API
-        const payload = { recent_data: simData.slice(-70) }; // Send last 70 days
+        // B. Prepare Payload
+        // The model needs 60 returns. We send the last 70 days of raw prices to be safe.
+        const payload = { recent_data: simData.slice(-70) };
 
+        // C. Call Render API
         const response = await fetch(`${API_URL}/predict`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -104,24 +118,32 @@ async function runPrediction() {
 
         const result = await response.json();
 
-        // C. UPDATE UI RESULTS
+        // D. Handle Results
+        if (result.status === "error") throw new Error(result.message);
+
         const predPrice = result.predicted_price;
         const predPct = result.predicted_return_percentage;
         
+        // Update Price Display
         document.getElementById('predPrice').innerText = `$${predPrice.toFixed(2)}`;
         
+        // Update Return % Display (Green for +, Red for -)
         const pctEl = document.getElementById('predReturn');
         pctEl.innerText = `${predPct > 0 ? "+" : ""}${predPct.toFixed(2)}%`;
         pctEl.style.color = predPct > 0 ? "#00ff88" : "#ff3333";
 
-        document.getElementById('predConfidence').innerText = result.confidence;
+        // Update Confidence
+        const confEl = document.getElementById('predConfidence');
+        confEl.innerText = result.confidence;
+        confEl.style.color = result.confidence === "HIGH" ? "#00ff88" : (result.confidence === "MEDIUM" ? "#ffcc00" : "#8b949e");
 
-        // D. UPDATE VISUALS
+        // Update Visuals
         updateGauge(predPct);
+        plotMainChart(); // Redraw chart to make sure any previous dots are cleared
         addPredictionDot(predPrice);
 
     } catch (error) {
-        alert("API Error: Is Render awake?");
+        alert("API Error: The Render backend might be sleeping. Wait 30s and try again.");
         console.error(error);
     } finally {
         btn.disabled = false;
@@ -129,52 +151,111 @@ async function runPrediction() {
     }
 }
 
-// 4. PLOTLY CHARTS
-function plotMainChart() {
-    const closes = simData.map(d => d[3]); // Close prices
-    // Generate dummy dates (simplified for demo)
-    const xIdx = Array.from({length: closes.length}, (_, i) => i);
+// =========================================================
+// 5. CHARTING (PLOTLY)
+// =========================================================
 
-    const trace1 = {
-        x: xIdx,
-        y: closes,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'AAPL Market',
-        line: { color: '#00b4d8', width: 2 }
+function plotMainChart() {
+    // Unpack data for Plotly
+    const dates = simData.map((_, i) => i); // Simple index x-axis
+    const opens = simData.map(d => d[0]);
+    const highs = simData.map(d => d[1]);
+    const lows = simData.map(d => d[2]);
+    const closes = simData.map(d => d[3]);
+    const volumes = simData.map(d => d[4]);
+
+    // Calculate SMA (Simple Moving Average)
+    const sma20 = calculateSMA(closes, 20);
+
+    // Trace 1: Candlesticks
+    const traceCandle = {
+        x: dates,
+        close: closes,
+        decreasing: { line: { color: '#ff3333' } },
+        high: highs,
+        increasing: { line: { color: '#00ff88' } },
+        line: { color: 'rgba(31,119,180,1)' },
+        low: lows,
+        open: opens,
+        type: 'candlestick', 
+        name: 'AAPL Price',
+        yaxis: 'y'
     };
 
+    // Trace 2: SMA Trend Line
+    const traceSMA = {
+        x: dates,
+        y: sma20,
+        type: 'scatter',
+        mode: 'lines',
+        line: { color: '#ffff00', width: 1.5 }, // Yellow
+        name: '20-Day Trend',
+        hoverinfo: 'skip'
+    };
+
+    // Trace 3: Volume Bars
+    const traceVol = {
+        x: dates,
+        y: volumes,
+        type: 'bar',
+        marker: { color: '#30363d' },
+        name: 'Volume',
+        yaxis: 'y2'
+    };
+
+    // Layout
     const layout = {
         paper_bgcolor: '#161b22',
         plot_bgcolor: '#161b22',
         font: { color: '#c9d1d9' },
-        margin: { t: 20, b: 40, l: 40, r: 20 },
+        margin: { t: 30, b: 40, l: 50, r: 20 },
         showlegend: false,
-        xaxis: { showgrid: false, zeroline: false },
-        yaxis: { gridcolor: '#30363d' }
+        height: 450,
+        xaxis: { showgrid: false, rangeslider: { visible: false }, zeroline: false },
+        yaxis: { domain: [0.2, 1], gridcolor: '#30363d', autorange: true },
+        yaxis2: { domain: [0, 0.15], showgrid: false, zeroline: false }
     };
 
-    Plotly.newPlot('stockChart', [trace1], layout);
+    Plotly.newPlot('stockChart', [traceCandle, traceSMA, traceVol], layout);
 }
 
 function addPredictionDot(price) {
-    // Add a pulsing-like neon dot at the end
-    const lastX = simData.length; // Next day index
+    const lastX = simData.length; // Plot it at the "Next Day" index
     
     const tracePred = {
         x: [lastX],
         y: [price],
         mode: 'markers',
         marker: { 
-            color: '#00ff88', 
-            size: 15,
+            color: '#00eaff', // Neon Cyan
+            size: 12,
+            symbol: 'diamond',
             line: { color: '#ffffff', width: 2 } 
         },
-        name: 'AI Forecast'
+        name: 'AI Forecast',
+        yaxis: 'y'
     };
     
     Plotly.addTraces('stockChart', tracePred);
 }
+
+function calculateSMA(data, window) {
+    let sma = [];
+    for (let i = 0; i < data.length; i++) {
+        if (i < window - 1) {
+            sma.push(null);
+        } else {
+            let sum = 0;
+            for (let j = 0; j < window; j++) sum += data[i - j];
+            sma.push(sum / window);
+        }
+    }
+    return sma;
+}
+
+// =========================================================
+// 6. GAUGE CHART
+// =========================================================
 
 function initGauge() {
     const data = [{
@@ -184,12 +265,12 @@ function initGauge() {
         type: "indicator",
         mode: "gauge+number",
         gauge: {
-            axis: { range: [-2, 2] }, // Range from -2% to +2%
-            bar: { color: "transparent" }, // Hide default bar
+            axis: { range: [-2, 2] }, // -2% to +2% range
+            bar: { color: "transparent" }, // Hide standard bar
             steps: [
-                { range: [-2, -0.5], color: "#ff3333" }, // Strong Sell
+                { range: [-2, -0.5], color: "#ff3333" }, // Bearish
                 { range: [-0.5, 0.5], color: "#555" },   // Neutral
-                { range: [0.5, 2], color: "#00ff88" }    // Strong Buy
+                { range: [0.5, 2], color: "#00ff88" }    // Bullish
             ],
             threshold: {
                 line: { color: "white", width: 4 },
@@ -210,7 +291,7 @@ function initGauge() {
 }
 
 function updateGauge(percentChange) {
-    // Update the gauge value and the threshold line position
+    // Update the needle (threshold line) position
     const update = {
         value: percentChange,
         "gauge.threshold.value": percentChange
@@ -218,6 +299,7 @@ function updateGauge(percentChange) {
     
     Plotly.restyle('gaugeChart', update);
     
+    // Update Text Label below gauge
     const signalEl = document.getElementById('signalText');
     if (percentChange > 0.5) {
         signalEl.innerText = "STRONG BUY";
@@ -230,4 +312,5 @@ function updateGauge(percentChange) {
         signalEl.style.color = "#ccc";
     }
 }
+
 
